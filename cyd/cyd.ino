@@ -4,7 +4,8 @@
  * Konfiguration (diese Datei, Abschnitt unten):
  *   WIFI_SSID / WIFI_PASSWORD   – WLAN-Zugangsdaten (nur 2,4 GHz!)
  *   BACKEND_HOST / BACKEND_PORT – URL des Backends
- *   AUTO_SWITCH_MS              – Seiten-Wechsel-Intervall
+ *   AUTO_SWITCH_MS              – Seiten-Wechsel-Intervall (ohne API-Abruf)
+ *   DATA_REFRESH_MS             – Kurse neu vom Backend laden
  *   DISPLAY_CURRENCY / DISPLAY_LANGUAGE – 0/1 (EUR/USD, DE/EN)
  *
  * Assets & Seiten: nur server/config.json anpassen – kein neues Flashen nötig.
@@ -23,6 +24,7 @@
 #define BACKEND_HOST     "your-backend.example.com"
 #define BACKEND_PORT     443
 #define AUTO_SWITCH_MS   10000UL
+#define DATA_REFRESH_MS  60000UL   // API-Abruf (TLS dauert – nicht bei jedem Seitenwechsel)
 
 #define DISPLAY_CURRENCY 0   // 0 = EUR (€), 1 = USD ($)
 #define DISPLAY_LANGUAGE 0   // 0 = Deutsch, 1 = Englisch
@@ -77,6 +79,7 @@ static const int TOUCH_HEADER_Y_MAX = 28;
 static const uint16_t screenWidth = 320;
 static const uint16_t screenHeight = 240;
 static const unsigned long switchInterval = AUTO_SWITCH_MS;
+static const unsigned long dataRefreshInterval = DATA_REFRESH_MS;
 static const int SPARKLINE_LEN = 32;
 static const int MAX_ASSETS = 32;
 static const int MAX_PAGES = 16;
@@ -136,7 +139,10 @@ MarketData marketData[MAX_ASSETS];
 int currentPage = 0;
 int statPeriod = PERIOD_LIVE;
 unsigned long lastSwitchTime = 0;
+unsigned long lastDataFetchTime = 0;
 unsigned long lastLayoutRetry = 0;
+static IPAddress backendIp;
+static bool backendIpResolved = false;
 static const unsigned long LAYOUT_RETRY_MS = 30000;
 static int lastTouchX = 0;
 static int lastTouchY = 0;
@@ -168,9 +174,12 @@ static void initSecureClient() {
   client.setTimeout(25000);
 }
 
-static bool resolveBackendHost(IPAddress& outIp) {
-  if (WiFi.hostByName(BACKEND_HOST, outIp)) {
-    debugLogf("DNS %s -> %s", BACKEND_HOST, outIp.toString().c_str());
+/** Einmal nach WLAN – nicht bei jedem API-Abruf. */
+static bool resolveBackendHostOnce() {
+  if (backendIpResolved) return true;
+  if (WiFi.hostByName(BACKEND_HOST, backendIp)) {
+    backendIpResolved = true;
+    debugLogf("DNS %s -> %s", BACKEND_HOST, backendIp.toString().c_str());
     return true;
   }
   debugLogf("DNS FEHLER: %s", BACKEND_HOST);
@@ -433,36 +442,41 @@ bool readHttpResponse(String& outBody, int& outStatus) {
     if (line == "\r" || line.length() == 0) break;
   }
 
-  while (client.available()) {
-    outBody += client.readString();
+  outBody.reserve(12288);
+  uint8_t chunk[512];
+  while (client.connected() || client.available()) {
+    int avail = client.available();
+    if (avail <= 0) {
+      if (!client.connected()) break;
+      delay(1);
+      lv_task_handler();
+      continue;
+    }
+    int n = client.read(chunk, min(avail, (int)sizeof(chunk)));
+    if (n > 0) {
+      outBody.concat((const char*)chunk, (unsigned)n);
+    }
     lv_task_handler();
   }
   return outStatus == 200;
 }
 
 bool fetchFromBackend() {
-  if (WiFi.status() != WL_CONNECTED) {
-    debugLog("WLAN nicht verbunden");
-    return false;
-  }
+  if (WiFi.status() != WL_CONNECTED) return false;
+  if (!backendIpResolved) return false;
 
-  IPAddress backendIp;
-  if (!resolveBackendHost(backendIp)) return false;
+  unsigned long fetchStart = millis();
 
-  initSecureClient();
-  debugLogf(">>> TLS %s:%u /api/quotes", BACKEND_HOST, (unsigned)BACKEND_PORT);
-
-  if (!client.connect(BACKEND_HOST, (uint16_t)BACKEND_PORT)) {
-    debugLogf("FEHLER: TLS zu %s:%u", BACKEND_HOST, (unsigned)BACKEND_PORT);
+  // ESP32 Core 3.x: IP + Hostname (SNI), Zertifikate null bei setInsecure()
+  if (!client.connect(backendIp, (uint16_t)BACKEND_PORT, BACKEND_HOST, nullptr, nullptr, nullptr)) {
+    debugLog("FEHLER: TLS");
     client.stop();
     return false;
   }
 
-  client.print(String("GET /api/quotes HTTP/1.1\r\n") +
-               "Host: " + BACKEND_HOST + "\r\n" +
-               "User-Agent: ESP32-CYD-Ticker\r\n" +
-               "Accept: application/json\r\n" +
-               "Connection: close\r\n\r\n");
+  client.print("GET /api/quotes HTTP/1.1\r\nHost: ");
+  client.print(BACKEND_HOST);
+  client.print("\r\nConnection: close\r\n\r\n");
 
   unsigned long timeout = millis() + 20000;
   while (!client.available() && millis() < timeout) {
@@ -480,23 +494,15 @@ bool fetchFromBackend() {
   bool okHttp = readHttpResponse(response, httpStatus);
   client.stop();
 
-  debugLogf("Antwort: %u Bytes", response.length());
   if (!okHttp) {
     debugLogf("FEHLER: HTTP %d", httpStatus);
-    if (SERIAL_DEBUG && response.length() > 0 && response.length() < 400) {
-      Serial.println(response);
-    }
     return false;
   }
 
   String jsonData = extractJSON(response);
   if (jsonData.length() == 0) {
-    debugLog("FEHLER: Kein JSON in Antwort");
+    debugLog("FEHLER: Kein JSON");
     return false;
-  }
-
-  if (SERIAL_DEBUG && jsonData.length() < 500) {
-    Serial.println(jsonData);
   }
 
   DynamicJsonDocument doc(65536);
@@ -581,15 +587,12 @@ bool fetchFromBackend() {
   }
 
   debugLogf("Backend: %d/%d Kurse geladen", ok, numAssets);
-  printMarketStatus();
+  debugLogf("Fetch %lu ms", millis() - fetchStart);
+  if (SERIAL_DEBUG) printMarketStatus();
   return ok > 0;
 }
 
 void fetchAllMarketData() {
-  if (WiFi.status() != WL_CONNECTED) {
-    debugLog("WLAN nicht verbunden");
-    return;
-  }
   fetchFromBackend();
 }
 
@@ -946,11 +949,12 @@ void connectWiFi() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.print("[WiFi] OK, IP: ");
     Serial.println(WiFi.localIP());
+    initSecureClient();
+    resolveBackendHostOnce();
   } else {
     Serial.println("[WiFi] FEHLER");
   }
 
-  initSecureClient();
   updateStatusLED(WiFi.status() == WL_CONNECTED);
 }
 
@@ -960,8 +964,8 @@ void setup() {
   Serial.println();
   Serial.println("=== CYD Ticker (nur Backend) ===");
   Serial.printf("API: https://%s/api/quotes\n", BACKEND_HOST);
-  Serial.printf("Touch links=Seite | rechts=Statistik | BOOT | Auto %lus\n",
-                switchInterval / 1000);
+  Serial.printf("Touch links=Seite | rechts=Statistik | BOOT | Seite %lus | Daten %lus\n",
+                switchInterval / 1000, dataRefreshInterval / 1000);
 
   pinMode(BOOT_BTN_PIN, INPUT_PULLUP);
   pinMode(STATUS_LED_RED_PIN, OUTPUT);
@@ -986,11 +990,12 @@ void setup() {
   showWaitingLayout(tr("Lade …", "Loading…"));
   connectWiFi();
 
-  if (WiFi.status() == WL_CONNECTED) {
+  if (WiFi.status() == WL_CONNECTED && backendIpResolved) {
     if (strstr(BACKEND_HOST, "example.com") != nullptr) {
       debugLog("WARN: BACKEND_HOST in cyd.ino ist noch ein Platzhalter!");
     }
     fetchAllMarketData();
+    lastDataFetchTime = millis();
   }
   if (numPages > 0) {
     updatePageDisplay();
@@ -1015,9 +1020,18 @@ void loop() {
   if (numPages <= 0 && WiFi.status() == WL_CONNECTED && millis() - lastLayoutRetry >= LAYOUT_RETRY_MS) {
     lastLayoutRetry = millis();
     fetchAllMarketData();
+    lastDataFetchTime = millis();
     if (numPages > 0) updatePageDisplay();
-  } else if (numPages > 0 && millis() - lastSwitchTime >= switchInterval) {
-    advancePage(true, "AUTO");
+  } else if (numPages > 0) {
+    unsigned long now = millis();
+    if (WiFi.status() == WL_CONNECTED && (now - lastDataFetchTime) >= dataRefreshInterval) {
+      lastDataFetchTime = now;
+      fetchAllMarketData();
+      updatePageDisplay();
+    }
+    if ((now - lastSwitchTime) >= switchInterval) {
+      advancePage(false, "AUTO");
+    }
   }
 
   delay(2);
