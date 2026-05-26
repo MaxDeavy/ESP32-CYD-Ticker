@@ -1,5 +1,6 @@
 
-Ein Kurs-Ticker für das **ESP32-2432S028R (Cheap Yellow Display / CYD)**.  
+Ein Kurs-Ticker für das **ESP32-2432S028/R (Cheap Yellow Display / CYD)**.  
+
 Der ESP32 zeigt Live-Preise für Kryptowährungen, ETFs und Aktien auf dem eingebauten Touchscreen – alle Kurse kommen von einem selbst gehosteten Backend.
 
 ![IMG_8574](https://github.com/MaxDeavy/ESP32-CYD-Ticker/blob/main/demo.jpg?raw=true)
@@ -10,42 +11,12 @@ Der ESP32 zeigt Live-Preise für Kryptowährungen, ETFs und Aktien auf dem einge
 
 - Live-Kurse in EUR für Krypto, ETFs und Aktien (via [yfinance](https://github.com/ranaroussi/yfinance))
 - Kategorien: **Krypto · ETFs · Aktien** – automatische Seitenaufteilung (je 2 Karten pro CYD-Seite)
-- Mehrere Statistikzeiträume: **Live · 14 Tage · 30 Tage · 1 Jahr** (Sparkline-Charts)
+- Mehrere Statistikzeiträume: **Live · 14 Tage · 30 Tage · 1 Jahr** (Chart)
 - Touch-Bedienung: links = nächste Seite, rechts = Zeitraum wechseln
 - Web-UI unter der Backend-URL (mobil-optimiert, alle Kategorien als Reiter)
 - **Einfache Konfiguration**: Assets nur in `server/config.json` eintragen – ESP und Web-UI passen sich automatisch an
 - Self-hosted, keine externen API-Keys nötig
 - Docker-Deployment in einer Zeile
-
----
-
-## Projektstruktur
-
-```
-esp32-cyd-ticker/
-├── server/                        # Docker-Backend
-│   ├── config.json                # ← Asset-Liste hier anpassen
-│   ├── server.py                  # FastAPI-Backend (Kurse + API)
-│   ├── config_loader.py           # Lädt config.json, baut Seiten-Layout
-│   ├── requirements.txt           # Python-Abhängigkeiten
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── docker-compose.yml         # Backend-Deployment
-│   ├── deploy.env.example         # SERVER_NAME für Nginx (Kopie → deploy.env)
-│   ├── static/
-│   │   └── index.html             # Mobil-Web-UI
-│   └── deploy/
-│       ├── nginx-ticker.conf.template
-│       ├── generate-nginx.sh / .ps1
-│       └── nginx-ticker.conf      # generiert (gitignored)
-└── cyd/                           # ESP32-Firmware (Arduino IDE / PlatformIO)
-    ├── cyd.ino                    # Hauptsketch + Konfiguration (WLAN, Backend-URL)
-    ├── lv_conf.h                  # LVGL-Konfiguration
-    ├── User_Setup.h               # TFT_eSPI Pin-Belegung für das CYD
-    ├── lv_font_price_28.c/h       # Custom-Font (Montserrat 28 px mit €-Zeichen)
-    ├── platformio.ini             # PlatformIO-Build-Konfiguration (optional)
-    └── fonts/                     # Quell-Dateien zum Font-Neu-Generieren
-```
 
 ---
 
@@ -109,15 +80,6 @@ Das Backend läuft dann auf Port **4546**:
 | `convert_usd_to_eur` | nein | `true` für US-Aktien (USD → EUR Umrechnung via EUR/USD-Kurs) |
 | `yahoo_fallback` | nein | Alternativer Ticker, falls der Primäre keine Daten liefert |
 
-### Seiten werden automatisch aufgeteilt
-
-`assets_per_page: 2` → Pro Kategorie werden Seiten à 2 Karten erzeugt:
-
-| Assets in Kategorie | CYD-Seiten |
-|---|---|
-| 2 | 1 Seite |
-| 4 | 2 Seiten |
-| 5 | 3 Seiten (letzte mit 1 Karte) |
 
 **Nach jeder Änderung an `server/config.json`:**
 
@@ -159,10 +121,8 @@ Optional in **`cyd.ino`**:
 
 | Option | Werte | Wirkung |
 |---|---|---|
-| `DISPLAY_CURRENCY` | `0` / `1` | Preise in € oder $ |
-| `DISPLAY_LANGUAGE` | `0` / `1` | UI-Texte, Kategorie-Titel |
-
-> **TLS-Fehler?** Siehe Abschnitt [Fehlerbehebung TLS](#fehlerbehebung-tls) unten.
+| `DISPLAY_CURRENCY` | `0` / `1` | Preise in € oder $  -  0 = € 1 = $ |
+| `DISPLAY_LANGUAGE` | `0` / `1` | UI-Texte, Kategorie-Titel -  0 = DE,  1 = EN |
 
 > **WLAN:** Der ESP32 unterstützt ausschließlich **2,4-GHz-Netzwerke**. Er verbindet sich nicht mit reinen 5-GHz-Netzen oder gemischten Netzwerken, bei denen das 2,4-GHz-Band unter demselben Namen läuft. Falls dein Router beide Bänder unter einer gemeinsamen SSID ausstrahlt, trenne sie in den Router-Einstellungen oder richte ein dediziertes 2,4-GHz-Netz ein.
 
