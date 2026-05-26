@@ -12,7 +12,7 @@ Deutsch: [README_DE.md](README_DE.md)
 
 ## Features
 
-- Live prices in EUR for crypto, ETFs, and stocks (via [yfinance](https://github.com/ranaroussi/yfinance))
+- Live prices for crypto, ETFs, and stocks (via [yfinance](https://github.com/ranaroussi/yfinance))
 - Categories: **Crypto · ETFs · Stocks** – automatic page layout (2 cards per CYD page)
 - Multiple time ranges: **Live · 14 days · 30 days · 1 year** (chart)
 - Touch controls: tap left = next page, tap right = change time range
