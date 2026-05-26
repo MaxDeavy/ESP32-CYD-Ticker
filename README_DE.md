@@ -12,7 +12,7 @@ Der ESP32 zeigt Live-Preise für Kryptowährungen, ETFs und Aktien auf dem einge
 
 ## Features
 
-- Live-Kurse in EUR für Krypto, ETFs und Aktien (via [yfinance](https://github.com/ranaroussi/yfinance))
+- Live-Kurse für Krypto, ETFs und Aktien (via [yfinance](https://github.com/ranaroussi/yfinance))
 - Kategorien: **Krypto · ETFs · Aktien** – automatische Seitenaufteilung (je 2 Karten pro CYD-Seite)
 - Mehrere Statistikzeiträume: **Live · 14 Tage · 30 Tage · 1 Jahr** (Chart)
 - Touch-Bedienung: links = nächste Seite, rechts = Zeitraum wechseln
