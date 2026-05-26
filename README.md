@@ -110,7 +110,7 @@ Tip: search on [finance.yahoo.com](https://finance.yahoo.com) – the ticker is 
 ```cpp
 #define WIFI_SSID        "MyNetwork"
 #define WIFI_PASSWORD    "MyPassword"
-#define BACKEND_HOST     "your-domain.example"   // without https://
+#define BACKEND_HOST     "your-domain.example"   // OR IP,   without https://
 #define BACKEND_PORT     443
 ```
 
