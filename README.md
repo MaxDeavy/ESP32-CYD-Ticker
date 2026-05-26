@@ -1,57 +1,31 @@
+# ESP32 CYD Ticker
 
-A live price ticker for the **ESP32-2432S028R (Cheap Yellow Display / CYD)**.  
-The ESP32 displays real-time prices for cryptocurrencies, ETFs, and stocks on its built-in touchscreen. All prices are fetched from a self-hosted backend – no external API keys required.
+A price ticker for the **ESP32-2432S028/R (Cheap Yellow Display / CYD)**.
 
-![IMG_8574](https://github.com/MaxDeavy/ESP32-CYD-Ticker/blob/main/demo.jpg?raw=true)
+The ESP32 shows live prices for cryptocurrencies, ETFs, and stocks on the built-in touchscreen – all quotes come from a self-hosted backend.
+
+Deutsch: [README_DE.md](README_DE.md)
+
+![Demo](https://github.com/MaxDeavy/ESP32-CYD-Ticker/blob/main/demo.jpg?raw=true)
 
 ---
 
 ## Features
 
-- Live prices in EUR for crypto, ETFs, and stocks (powered by [yfinance](https://github.com/ranaroussi/yfinance))
-- Three categories: **Crypto · ETFs · Stocks** – pages are created automatically (2 cards per CYD page)
-- Multiple time ranges: **Live · 14 days · 30 days · 1 year** with sparkline charts
-- Touch controls: tap left = next page, tap right = cycle time range
-- Mobile-optimised web UI served by the backend
-- **Simple configuration**: edit `server/config.json` to add or remove assets – the ESP and web UI update automatically, no re-flashing needed
-- Fully self-hosted, no third-party API keys
+- Live prices in EUR for crypto, ETFs, and stocks (via [yfinance](https://github.com/ranaroussi/yfinance))
+- Categories: **Crypto · ETFs · Stocks** – automatic page layout (2 cards per CYD page)
+- Multiple time ranges: **Live · 14 days · 30 days · 1 year** (chart)
+- Touch controls: tap left = next page, tap right = change time range
+- Web UI at the backend URL (mobile-friendly, categories as tabs)
+- **Simple setup**: edit assets in `server/config.json` only – ESP and web UI update automatically
+- Self-hosted, no external API keys
 - One-line Docker deployment
 
 ---
 
-## Project Structure
+## Quick start
 
-```
-esp32-cyd-ticker/
-├── server/                        # Docker backend
-│   ├── config.json                # ← Edit this to manage assets
-│   ├── server.py                  # FastAPI backend (quotes + API)
-│   ├── config_loader.py           # Loads config.json, builds page layout
-│   ├── requirements.txt           # Python dependencies
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── docker-compose.yml         # Backend deployment
-│   ├── deploy.env.example         # SERVER_NAME for Nginx (copy → deploy.env)
-│   ├── static/
-│   │   └── index.html             # Mobile web UI
-│   └── deploy/
-│       ├── nginx-ticker.conf.template
-│       ├── generate-nginx.sh / .ps1
-│       └── nginx-ticker.conf      # generated (gitignored)
-└── cyd/                           # ESP32 firmware (Arduino IDE / PlatformIO)
-    ├── cyd.ino                    # Main sketch + configuration (Wi-Fi, backend URL)
-    ├── lv_conf.h                  # LVGL configuration
-    ├── User_Setup.h               # TFT_eSPI pin mapping for the CYD
-    ├── lv_font_price_28.c/h       # Custom font (Montserrat 28 px with € symbol)
-    ├── platformio.ini             # PlatformIO build config (optional)
-    └── fonts/                     # Source files for regenerating the custom font
-```
-
----
-
-## Quick Start
-
-### 1. Start the Backend (Docker)
+### 1. Start the backend (Docker)
 
 ```bash
 cd server
@@ -62,20 +36,20 @@ The backend runs on port **4546**:
 
 | Endpoint | Description |
 |---|---|
-| `http://localhost:4546/` | Web UI (mobile-optimised) |
+| `http://localhost:4546/` | Web UI (mobile-friendly) |
 | `http://localhost:4546/api/quotes` | JSON API for the ESP32 |
 | `http://localhost:4546/api/config` | Current layout (pages, categories) |
 | `http://localhost:4546/health` | Health check |
 
 ### 2. Flash the ESP32
 
-1. Open the `cyd/` folder in Arduino IDE (it will find `cyd.ino` automatically) and fill in your Wi-Fi credentials and backend URL at the top (see [ESP32 Configuration](#esp32-configuration)).
-2. Compile and flash using **Arduino IDE** or **PlatformIO** (serial monitor: 115200 baud).
-3. The ESP32 connects to the backend on boot and starts displaying prices.
+1. Open the `cyd/` folder in Arduino IDE (it picks up `cyd.ino` automatically) and enter your Wi-Fi credentials and backend URL at the top (see [ESP32 configuration](#esp32-configuration)).
+2. Build and flash with **Arduino IDE** or **PlatformIO** (serial monitor: 115200).
+3. On boot, the ESP connects to the backend and displays prices.
 
 ---
 
-## Managing Assets
+## Configuring assets
 
 **The only file you need to edit:** `server/config.json`
 
@@ -92,32 +66,22 @@ The backend runs on port **4546**:
   "category_order": ["crypto", "etf", "stock"],
   "assets": [
     { "id": "btc",   "name": "Bitcoin",  "category": "crypto", "yahoo": "BTC-EUR" },
-    { "id": "aapl",  "name": "Apple",    "category": "stock",  "yahoo": "AAPL",      "convert_usd_to_eur": true },
-    { "id": "csspx", "name": "S&P 500",  "category": "etf",    "yahoo": "CSSPX.MI",  "yahoo_fallback": "CSPX.L" }
+    { "id": "aapl",  "name": "Apple",    "category": "stock",  "yahoo": "AAPL", "convert_usd_to_eur": true },
+    { "id": "csspx", "name": "S&P 500",  "category": "etf",    "yahoo": "CSSPX.MI", "yahoo_fallback": "CSPX.L" }
   ]
 }
 ```
 
-### Asset fields
+### Fields
 
 | Field | Required | Description |
 |---|---|---|
-| `id` | yes | Unique internal identifier (lowercase) |
-| `name` | yes | Display name shown on the CYD and in the web UI |
+| `id` | yes | Unique internal id (lowercase) |
+| `name` | yes | Display name on the CYD and in the web UI |
 | `category` | yes | `crypto`, `etf`, or `stock` |
 | `yahoo` | yes | Yahoo Finance ticker (e.g. `BTC-EUR`, `AAPL`, `CSSPX.MI`) |
-| `convert_usd_to_eur` | no | Set to `true` for USD-denominated assets (uses live EUR/USD rate) |
-| `yahoo_fallback` | no | Alternative ticker if the primary one has no data |
-
-### Automatic page splitting
-
-`assets_per_page: 2` → pages are created per category automatically:
-
-| Assets in category | CYD pages |
-|---|---|
-| 2 | 1 page |
-| 4 | 2 pages |
-| 5 | 3 pages (last page has 1 card) |
+| `convert_usd_to_eur` | no | `true` for US stocks (USD → EUR via live EUR/USD rate) |
+| `yahoo_fallback` | no | Alternative ticker if the primary returns no data |
 
 **After every change to `server/config.json`:**
 
@@ -126,7 +90,7 @@ cd server
 docker compose up -d --build
 ```
 
-The ESP picks up the new layout on its next automatic data refresh – no re-flashing required.
+The ESP picks up the new layout on the next automatic quote refresh – no re-flash needed.
 
 ### Finding Yahoo Finance tickers
 
@@ -135,65 +99,77 @@ The ESP picks up the new layout on its next automatic data refresh – no re-fla
 - **EUR-denominated ETFs:** e.g. `CSSPX.MI` (iShares S&P 500, Borsa Italiana), `IWDA.AS` (iShares MSCI World, Amsterdam)
 - **European stocks:** `SAP.DE`, `BMW.DE`, etc.
 
-Tip: search on [finance.yahoo.com](https://finance.yahoo.com) – the ticker is shown in the URL.
+Tip: search on [finance.yahoo.com](https://finance.yahoo.com) – the ticker is in the URL.
 
 ---
 
-## ESP32 Configuration
+## ESP32 configuration
 
-At the top of **`cyd/cyd.ino`** there is a configuration block:
+**Wi-Fi + backend** at the top of **`cyd/cyd.ino`**:
 
 ```cpp
-#define WIFI_SSID        "YourNetwork"
-#define WIFI_PASSWORD    "YourPassword"
-#define BACKEND_HOST     "your-backend.example.com"  // or IP: "192.168.1.100"
-#define BACKEND_PORT     443                   // 80 for HTTP, 443 for HTTPS
-#define AUTO_SWITCH_MS   10000UL
+#define WIFI_SSID        "MyNetwork"
+#define WIFI_PASSWORD    "MyPassword"
+#define BACKEND_HOST     "your-domain.example"   // without https://
+#define BACKEND_PORT     443
+```
 
+Optional in **`cyd.ino`**:
+
+```cpp
 #define DISPLAY_CURRENCY 0   // 0 = EUR, 1 = USD
 #define DISPLAY_LANGUAGE 0   // 0 = DE,  1 = EN
 ```
 
 | Option | Values | Effect |
 |---|---|---|
-| `DISPLAY_CURRENCY` | `0` / `1` | Show prices in € or $ (USD converted using `eur_usd` from the API) |
-| `DISPLAY_LANGUAGE` | `0` / `1` | UI strings, period labels, category titles (e.g. Krypto/Crypto) |
+| `DISPLAY_CURRENCY` | `0` / `1` | Prices in € or $ – 0 = €, 1 = $ |
+| `DISPLAY_LANGUAGE` | `0` / `1` | UI strings, category titles – 0 = DE, 1 = EN |
 
-Only these values need to be changed. Everything else (assets, pages, categories) comes from the backend. Asset display names in `server/config.json` are independent of `DISPLAY_LANGUAGE`.
-
-> **Note:** `cyd/cyd.ino` contains your Wi-Fi password. Replace the credentials with placeholders before pushing to a public repository.
-
-> **Wi-Fi:** The ESP32 only supports **2.4 GHz** networks. It will not connect to 5 GHz-only or mixed-band networks where the 2.4 GHz SSID is not separately visible. If your router broadcasts both bands under the same name, either separate them in your router settings or create a dedicated 2.4 GHz network.
+> **Wi-Fi:** The ESP32 only supports **2.4 GHz** networks. It will not connect to 5 GHz-only networks, or to combined dual-band networks that hide 2.4 GHz under the same SSID. If your router broadcasts both bands under one name, split them in the router settings or create a dedicated 2.4 GHz network.
 
 ---
 
-## Display Controls
+## Display controls
 
 | Action | Function |
 |---|---|
 | Tap **left** (< screen centre) | Next page |
-| Tap **right** (> screen centre) | Cycle time range (Live → 1 Year → 30 Days → 14 Days) |
-| **BOOT button** | Next page (without fetching new data) |
-| **Auto** (every 10 s) | Next page + fetch fresh data |
+| Tap **right** (> screen centre) | Change time range (Live → 1 year → 30 days → 14 days) |
+| **BOOT button** | Next page (without reloading data) |
+| **Auto** (every 10 s) | Next page + refresh quotes |
 
 ---
 
-## Reverse Proxy (Public URL)
+## Reverse proxy (public URL)
 
-Copy `server/deploy.env.example` → `server/deploy.env`, set `SERVER_NAME`, then generate Nginx config:
+**`server/deploy.env`** (`SERVER_NAME`) → generate Nginx config:
 
 ```bash
 cd server
-cp deploy.env.example deploy.env   # edit SERVER_NAME
+cp deploy.env.example deploy.env   # set SERVER_NAME
 cd deploy && ./generate-nginx.sh
 sudo cp nginx-ticker.conf /etc/nginx/sites-available/ticker.conf
 sudo ln -sf /etc/nginx/sites-available/ticker.conf /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-Docker: `cd server && docker compose up -d` (host port **4546** by default, override with `TICKER_HOST_PORT` in the shell or `.env`).
+On Windows, use `.\generate-nginx.ps1` instead of `./generate-nginx.sh`.
 
-### Debugging
+Docker: `cd server && docker compose up -d` (host port **4546**).
+
+### TLS troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `TLS connection failed` | Placeholder domain in `cyd.ino` | Set `BACKEND_HOST` to your real domain, re-flash |
+| `DNS ERROR` | Wrong `BACKEND_HOST` or no internet | Check hostname (no `https://`) |
+| TLS OK but `No layout` | Backend/Nginx down | `curl https://YOUR-DOMAIN/health` |
+| Local testing only | Port 443 without Cloudflare | `BACKEND_PORT` **4546** + HTTP (LAN only, adjust sketch) |
+
+Serial monitor **115200**: after a successful fix you should see `DNS … -> …` and `HTTP Status: … (200)`.
+
+### Debug
 
 ```bash
 cd server
@@ -203,11 +179,11 @@ curl http://localhost:4546/health
 ```
 
 `/api/debug` shows per-asset errors, Yahoo tickers, and sparkline lengths.  
-The ESP32 serial monitor (**115200 baud**) prints connection and data-loading logs.
+ESP32 serial monitor (**115200 baud**) prints connection and load logs.
 
 ---
 
-## Running the Backend Without Docker
+## Backend without Docker (local)
 
 ```bash
 cd server
@@ -231,17 +207,17 @@ pio run -t upload
 pio device monitor
 ```
 
-The `platformio.ini` in the `cyd/` folder is pre-configured. Libraries are downloaded automatically.
+The `platformio.ini` in `cyd/` is preconfigured. Libraries are downloaded automatically.
 
 ---
 
-## Custom Font (€ Symbol)
+## Custom font (€ symbol)
 
-The default LVGL fonts do not include the € symbol, so `lv_font_price_28.c/h` provides a custom Montserrat 28 px font for the price row.
+LVGL default fonts do not include **€** – the repo ships `lv_font_price_28.c/h` (Montserrat 28 px for the price row).
 
-The `cyd/fonts/` folder contains the source files to regenerate it (Node.js required):
+The `cyd/fonts/` folder has sources to regenerate the font (Node.js required):
 
-```bash
+```powershell
 cd cyd
 npx --yes lv_font_conv \
   --font fonts/Montserrat-Medium.ttf \
@@ -260,24 +236,24 @@ Then copy `lv_font_price_28.c` and `.h` from `cyd/fonts/` into `cyd/`.
 - **Board:** ESP32-2432S028R (Cheap Yellow Display)
 - **Display:** 320 × 240 px, ILI9341
 - **Touch:** XPT2046 (resistive)
-- **Power:** USB (flash + run)
+- **USB:** flash and power
 
-Other CYD variants (e.g. with capacitive touch) may require adjustments in `cyd/User_Setup.h` and the touch pin definitions in `cyd/cyd.ino`.
+Other CYD variants (e.g. capacitive touch) may need changes in `cyd/User_Setup.h` and the touch pin definitions in `cyd/cyd.ino`.
 
 ---
 
-## Library Versions
+## Library versions
 
-The firmware is tested with the following library versions. Other versions may work but are not guaranteed.
+Firmware tested with these versions. Others may work but are not guaranteed.
 
 | Library | Version | Notes |
 |---|---|---|
-| [lvgl/lvgl](https://github.com/lvgl/lvgl) | **8.4.x** | LVGL 9.x has breaking API changes – do not upgrade |
+| [lvgl/lvgl](https://github.com/lvgl/lvgl) | **8.4.x** | LVGL 9.x has breaking changes – do not upgrade |
 | [bodmer/TFT_eSPI](https://github.com/Bodmer/TFT_eSPI) | **2.5.43** | Pin config via `cyd/User_Setup.h` |
 | [bblanchon/ArduinoJson](https://github.com/bblanchon/ArduinoJson) | ^7.2.0 | |
 | [paulstoffregen/XPT2046_Touchscreen](https://github.com/PaulStoffregen/XPT2046_Touchscreen) | ^1.4 | |
 
-These are also pinned in `cyd/platformio.ini`. When using Arduino IDE, install exactly these versions via the Library Manager to avoid compatibility issues.
+These are also pinned in `cyd/platformio.ini`. In Arduino IDE, install exactly these versions via the Library Manager to avoid compatibility issues.
 
 ---
 

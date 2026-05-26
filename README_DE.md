@@ -1,5 +1,8 @@
+# ESP32 CYD Ticker
 
-Ein Kurs-Ticker für das **ESP32-2432S028/R (Cheap Yellow Display / CYD)**.  
+Ein Kurs-Ticker für das **ESP32-2432S028/R (Cheap Yellow Display / CYD)**.
+
+English: [README.md](README.md)  
 
 Der ESP32 zeigt Live-Preise für Kryptowährungen, ETFs und Aktien auf dem eingebauten Touchscreen – alle Kurse kommen von einem selbst gehosteten Backend.
 
