@@ -1,0 +1,23 @@
+services:
+  ticker-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cyd-ticker-api
+    restart: unless-stopped
+    ports:
+      # Nginx proxy_pass must point to this host port (default 4546, container internal 8080)
+      - "${TICKER_HOST_PORT:-4546}:8080"
+    environment:
+      REFRESH_SECONDS: "60"
+      CONFIG_PATH: "/app/config.json"
+      SPARKLINE_DAYS: "10"
+      DEBUG: "1"
+    volumes:
+      - ./config.json:/app/config.json:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s

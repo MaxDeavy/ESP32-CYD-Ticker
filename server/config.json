@@ -1,0 +1,21 @@
+{
+  "display": {
+    "assets_per_page": 2
+  },
+  "categories": {
+    "crypto": "Krypto",
+    "etf": "ETFs",
+    "stock": "Aktien"
+  },
+  "category_order": ["crypto", "etf", "stock"],
+  "assets": [
+    { "id": "btc", "name": "Bitcoin", "category": "crypto", "yahoo": "BTC-EUR" },
+    { "id": "xrp", "name": "XRP", "category": "crypto", "yahoo": "XRP-EUR" },
+    { "id": "csspx", "name": "S&P 500", "category": "etf", "yahoo": "CSSPX.MI", "yahoo_fallback": "CSPX.L" },
+    { "id": "tnow", "name": "MSCI World", "category": "etf", "yahoo": "TNOW.PA", "yahoo_fallback": "IWDA.AS" },
+    { "id": "nvda", "name": "NVIDIA", "category": "stock", "yahoo": "NVDA", "convert_usd_to_eur": true },
+    { "id": "aapl", "name": "Apple", "category": "stock", "yahoo": "AAPL", "convert_usd_to_eur": true },
+    { "id": "googl", "name": "Google", "category": "stock", "yahoo": "GOOGL", "convert_usd_to_eur": true },
+    { "id": "msft", "name": "Microsoft", "category": "stock", "yahoo": "MSFT", "convert_usd_to_eur": true }
+  ]
+}
